@@ -51,6 +51,7 @@ INTO ( @fromAirport, @toAirport ).
 ro_connection = NEW #( airlineid = airlineid connectionnumber = connectionnumber fromairport = fromairport toairport = toairport ).
 
 
+
 ENDMETHOD.
 
 

@@ -32,6 +32,9 @@ CLASS zivar_cl_inhe IMPLEMENTATION.
     out->write( 'Output using passenger plane object reference' ).
     out->write( passenger->Get_attributes( ) ).
 
+    out->write( 'Output using cargo plane object reference' ).
+    out->write( cargo->Get_attributes( ) ).
+
 
     plane = passenger.
 
@@ -56,7 +59,14 @@ CLASS zivar_cl_inhe IMPLEMENTATION.
 
 * Make sure the plane is actually a passenger plane, then force the cast.
     IF plane IS INSTANCE OF lcl_passenger_plane.
-      passenger = CAST #( plane ).
+*      passenger = CAST #( plane ).
+*      cargo ?= plane .
+      cargo = CAST #( plane ).
+
+
+      out->write( 'Output using subclass object reference' ).
+      out->write( cargo->get_attributes( ) ).
+
     ENDIF.
 
 

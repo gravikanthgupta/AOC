@@ -29,6 +29,8 @@ CLASS zivar_cl_factory IMPLEMENTATION.
 
     connection = lcl_connection=>get_connection( airlineid = 'LH' connectionnumber = '0400' ).
 
+*    data(lo_con) =  NEW lcl_connection( airlineid = 'LH' connectionnumber = '0400' fromairport = '10' toairport = '20' ).
+
     out->write( connection->get_airlineid( ) ).
     out->write( connection->get_connection_id(  ) ).
     out->write( connection->get_from(  ) ).

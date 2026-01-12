@@ -2,7 +2,7 @@
 *"* local helper classes, interface definitions and type
 *"* declarations
 
-CLASS lcl_connection DEFINITION CREATE PRIVATE.
+CLASS lcl_connection DEFINITION CREATE priVATE.
   PUBLIC SECTION.
     METHODS constructor
       IMPORTING

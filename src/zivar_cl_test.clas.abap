@@ -29,7 +29,20 @@ connection = lcl_connection=>get_connection( airlineid = 'LH' connectionnumber =
 connection = lcl_connection=>get_connection( airlineid = 'LH' connectionnumber = '0400' ).
 
 
+*SELECT  FROM /dmo/connection FIELDS airport_from_id, airport_to_id
+*inTO table @data(lt_n) uP TO 100 rows.
+
+*cl_salv_table=>factory(
+*  IMPORTING r_salv_table = DATA(lo_alv)
+*  CHANGING  t_table      = lt_n ).
+*lo_alv->display( ).
+
+
+
 ENDMETHOD.
 
 
 ENDCLASS.
+*
+
+
