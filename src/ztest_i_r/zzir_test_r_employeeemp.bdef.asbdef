@@ -1,0 +1,49 @@
+managed implementation in class ZZIBP_R_TEST_R_EMPLOYEEEMP unique;
+strict ( 2 );
+with draft;
+extensible;
+define behavior for ZZIR_TEST_R_EMPLOYEEEMP alias ZzirTestREmployeeemp
+persistent table ZTEST_R_EMPLOYEE
+extensible
+draft table ZZITST_R_EM_DEMP
+etag master LocalLastChangedAt
+lock master total etag LastChangedAt
+authorization master( global )
+{
+  field ( mandatory : create )
+   ID;
+
+  field ( readonly )
+   LocalCreatedBy,
+   LocalCreatedAt,
+   LocalLastChangedBy,
+   LocalLastChangedAt,
+   LastChangedAt;
+
+  field ( readonly : update )
+   ID;
+
+
+  create;
+  update;
+  delete;
+
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Edit;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for ZTEST_R_EMPLOYEE corresponding extensible
+  {
+    ID = id;
+    Name = name;
+    Designation = designation;
+    LocalCreatedBy = local_created_by;
+    LocalCreatedAt = local_created_at;
+    LocalLastChangedBy = local_last_changed_by;
+    LocalLastChangedAt = local_last_changed_at;
+    LastChangedAt = last_changed_at;
+  }
+
+}

@@ -1,0 +1,27 @@
+projection;
+strict;
+use draft;
+use side effects;
+define behavior for ZC_EmployeeDetails_S alias EmployeeDetailsAll
+{
+  use action Edit;
+  use action Activate;
+  use action Discard;
+  use action Resume;
+  use action Prepare;
+  use action SelectCustomizingTransptReq;
+
+  use association _EmployeeDetails { create; with draft; }
+
+}
+
+define behavior for ZC_EmployeeDetails alias EmployeeDetails
+{
+  use update;
+  use delete;
+
+  use action Copy;
+
+  use association _EmployeeDetailsAll { with draft; }
+
+}

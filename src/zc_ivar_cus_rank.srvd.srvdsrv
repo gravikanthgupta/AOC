@@ -1,0 +1,4 @@
+@EndUserText.label: 'Customer ranking'
+define service ZC_IVAR_CUS_RANK {
+  expose zc_ivar_cus_rank as customer_Rank;
+}

@@ -18,6 +18,7 @@ CLASS zivar_cl_new_syn DEFINITION
     CLASS-METHODS : s1_loop_with_grouping.
     CLASS-METHODS : s1_loop_with_single_line.
     CLASS-METHODS : s1_loop_reduce_statement.
+    CLASS-METHODS:  s1_let_example.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -108,6 +109,7 @@ CLASS zivar_cl_new_syn IMPLEMENTATION.
     lv_res = COND #( LET val = 800 IN
                      WHEN lv_num > val THEN 'X'
                      ELSE '' ).
+
     im_res = lv_res.
 
 
@@ -312,6 +314,25 @@ CLASS zivar_cl_new_syn IMPLEMENTATION.
     " In loops also use key
     LOOP AT itab INTO wa USING KEY cus_key WHERE carrier_id = 'AA'.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD s1_let_example.
+  DATA: itab TYPE TABLE OF /dmo/booking WITH DEFAULT KEY.
+  TYPES: BEGIN OF ty_final_booking.
+             INCLUDE TYPE /dmo/booking.
+    TYPES:   booking_tx TYPE p LENGTH 10 DECIMALS 2,
+           END OF ty_final_booking,
+           tt_final_booking TYPE TABLE OF ty_final_booking WITH DEFAULT KEY.
+
+    SELECT * FROM /dmo/booking INTO TABLE @DATA(lt_bookings) UP TO 100 ROWS.
+
+    DATA(lt_final_booking) = VALUE tt_final_booking( FOR wa IN lt_bookings
+                                                       LET lv_price = wa-flight_price * '0.5' IN (
+                                                       travel_id = wa-travel_id
+                                                       booking_id = wa-booking_id
+                                                       flight_price = lv_price
+                                                       booking_tx = wa-flight_price + lv_price ) ).
 
   ENDMETHOD.
 

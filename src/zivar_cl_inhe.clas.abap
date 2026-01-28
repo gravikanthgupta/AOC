@@ -36,6 +36,9 @@ CLASS zivar_cl_inhe IMPLEMENTATION.
     out->write( cargo->Get_attributes( ) ).
 
 
+* Up casting Assigning an instance of a subclass to a reference variable of a superclass
+* This is automatically allowed by the ABAP runtime as the superclass reference provides a "less specific" view,
+* which is always compatible with the "more specific" subclass object.
     plane = passenger.
 
 
@@ -56,6 +59,9 @@ CLASS zivar_cl_inhe IMPLEMENTATION.
 
 *passenger = plane.
 
+* Downcasting (Widening Cast): Assigning an instance of a superclass to a reference variable of a subclass.
+* This is not automatically allowed at compile time because the subclass reference provides a "more specific" view of the object
+* To perform a downcast, you must use the casting operator (?= or the CAST operator in modern ABAP syntax)
 
 * Make sure the plane is actually a passenger plane, then force the cast.
     IF plane IS INSTANCE OF lcl_passenger_plane.

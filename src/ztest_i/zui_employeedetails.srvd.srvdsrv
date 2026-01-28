@@ -1,0 +1,5 @@
+@ObjectModel.leadingEntity.name: 'ZC_EmployeeDetails_S'
+define service ZUI_EMPLOYEEDETAILS {
+  expose ZC_EMPLOYEEDETAILS_S as EmployeeDetailsAll;
+  expose ZC_EMPLOYEEDETAILS as EmployeeDetails;
+}

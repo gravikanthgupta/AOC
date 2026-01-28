@@ -1,0 +1,6 @@
+@EndUserText.label: 'ZZIR_TEST_R_EMPLOYEEEMP'
+@MappingRole: true
+define role ZZIR_TEST_R_EMPLOYEEEMP {
+  grant select on ZZIR_TEST_R_EMPLOYEEEMP
+  where TRUE;
+}

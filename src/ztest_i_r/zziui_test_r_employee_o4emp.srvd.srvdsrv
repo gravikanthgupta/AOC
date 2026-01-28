@@ -1,0 +1,11 @@
+@EndUserText: {
+  label: 'Service Definition for ZZIC_TEST_R_EMPLOYEEEMP'
+}
+@ObjectModel: {
+  leadingEntity: {
+    name: 'ZZIC_TEST_R_EMPLOYEEEMP'
+  }
+}
+define service ZZIUI_TEST_R_EMPLOYEE_O4EMP provider contracts odata_v4_ui {
+  expose ZZIC_TEST_R_EMPLOYEEEMP;
+}

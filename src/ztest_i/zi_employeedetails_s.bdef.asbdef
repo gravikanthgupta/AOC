@@ -1,0 +1,81 @@
+managed with additional save implementation in class ZBP_I_EMPLOYEEDETAILS_S unique;
+strict;
+with draft;
+define behavior for ZI_EmployeeDetails_S alias EmployeeDetailsAll
+draft table ZTEST_R_EMP_D_S
+with unmanaged save
+lock master total etag LastChangedAtMax
+authorization master( global )
+{
+  field ( readonly )
+   SingletonID,
+   TransportRequestID;
+
+  field ( notrigger )
+   SingletonID,
+   HideTransport,
+   LastChangedAtMax;
+
+
+  update;
+  internal create;
+  internal delete;
+
+  draft action ( features : instance ) Edit with additional implementation;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare {
+    validation EmployeeDetails ~ ValidateDataConsistency;
+  }
+  action ( features : instance ) SelectCustomizingTransptReq parameter D_SelectCustomizingTransptReqP result [1] $self;
+
+  association _EmployeeDetails { create ( features : instance ); with draft; }
+
+  validation ValidateTransportRequest on save ##NOT_ASSIGNED_TO_DETACT { create; update; }
+
+  side effects
+  {
+    action SelectCustomizingTransptReq affects
+        $self;
+  }
+
+}
+
+define behavior for ZI_EmployeeDetails alias EmployeeDetails ##UNMAPPED_FIELD
+persistent table ZTEST_R_EMP
+draft table ZTEST_R_EMP_D
+lock dependent by _EmployeeDetailsAll
+authorization dependent by _EmployeeDetailsAll
+{
+  field ( mandatory : create )
+   Id;
+
+  field ( readonly )
+   SingletonID;
+
+  field ( readonly : update )
+   Id;
+
+  field ( notrigger )
+   SingletonID;
+
+
+  update( features : global );
+  delete( features : global );
+
+  factory action ( features : instance ) Copy parameter ZD_CopyEmployeeDetailsP [1];
+
+  mapping for ZTEST_R_EMP
+  {
+    Id = ID;
+    Name = NAME;
+    Designation = DESIGNATION;
+  }
+
+  association _EmployeeDetailsAll { with draft; }
+
+  validation ValidateTransportRequest on save ##NOT_ASSIGNED_TO_DETACT { create; update; delete; }
+  validation ValidateDataConsistency on save { create; update; }
+
+}

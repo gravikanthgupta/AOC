@@ -2,6 +2,10 @@
 *"* local helper classes, interface definitions and type
 *"* declarations
 
+
+* A Factory Method in SAP ABAP is a creational design pattern used to centralize and control the creation of objects.
+* Instead of a client calling NEW class_name( ) directly, they call a static method (e.g., create( )) that returns the instance.
+
 CLASS lcl_connection DEFINITION CREATE priVATE.
   PUBLIC SECTION.
     METHODS constructor
