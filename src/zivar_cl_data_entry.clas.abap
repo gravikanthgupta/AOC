@@ -182,7 +182,7 @@ CLASS ZIVAR_CL_DATA_ENTRY IMPLEMENTATION.
            n type i,
            seed type i,
            lv_date type timestamp,
-           lv_ord_id type zats_ad_dte_id,
+           lv_ord_id type zivar_r_dte_id,
            lt_so type table of zivar_r_so_hdr,
            lt_so_i type table of zivar_r_so_item.
 

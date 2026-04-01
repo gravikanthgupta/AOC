@@ -116,7 +116,7 @@ early numbering
 {
   update;
   delete;
-  field ( readonly ) TravelId, BookingId, BookingSupplementId;
+  field ( readonly ) TravelId, BookingId, BookingSupplementId, LastChangedAt;
 
   field ( mandatory ) Price, SupplementId;
 
