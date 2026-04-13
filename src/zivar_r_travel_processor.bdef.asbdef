@@ -11,6 +11,11 @@ define behavior for zivar_r_travel_processor alias Travel
 // Expose the copyTravel to projection also.
   use action copyTravel;
   use association _Booking { create; }
+
+   side effects
+  {
+    field BookingFee affects field TotalPrice;
+  }
 }
 
 define behavior for zivar_r_booking_processor alias Booking
@@ -20,6 +25,11 @@ define behavior for zivar_r_booking_processor alias Booking
 
   use association _Travel;
   use association _BookingSupplement { create; }
+
+   side effects
+  {
+    field FlightPrice affects field _Travel.TotalPrice;
+  }
 }
 
 define behavior for ZIVAR_R_BOOkSUPPL_PROCESSOR alias BookSuppl
@@ -29,4 +39,9 @@ define behavior for ZIVAR_R_BOOkSUPPL_PROCESSOR alias BookSuppl
 
   use association _Travel;
   use association _Booking;
+
+   side effects
+  {
+    field Price affects field _Travel.TotalPrice;
+  }
 }

@@ -1,4 +1,4 @@
-managed;
+managed implementation in class zbp_ivar_r_travel unique;
 // implementation in class zbp_ivar_r_travel unique;
 // Guidelines and best practice for definition to be followed
 // 2 - is latest guidelines. 1 - old guidelines
@@ -23,6 +23,7 @@ authorization master ( instance )
 // etag for concurrency control
 etag master LastChangedAt
 early numbering
+with additional save
 {
   // Here are the operations which RAP will generate automatically (Manage)
   create ( authorization : global );
@@ -36,15 +37,33 @@ early numbering
   // Dynamic feature control at the time of creation of Booking. Creation of booking isntances
   // controlled by dynamic feature based on rejection or not
 
-  association _Booking { create (features:instance); }
+  association _Booking { create ( features : instance ); }
+
+  // Its a piece of code which is intented to be only consumed within our RAP BO
+  // We cannot use outside RAP
+  // Reusable purpose. We can reuse many aread
+  internal action reCalcTotalPrice;
+
+  // Define determination to execute the code when
+  // booking fee or curr code changes so we calc total price
+  determination calculateTotalPrice on modify { create; field BookingFee, CurrencyCode; }
+
+  // Checking custom business object rules
+  validation validateHeaderData on save { create; field CustomerId, BeginDate, EndDate; }
 
   // Static feature control
-  field ( readonly ) TravelId, CreatedBy, CreatedAt, LastChangedAt, LastChangedBy;
-  field (mandatory) AgencyId, CustomerId, BeginDate, EndDate, OverallStatus, BookingFee, CurrencyCode;
+  field ( readonly ) TravelId, TotalPrice, CreatedBy, CreatedAt, LastChangedAt, LastChangedBy;
+  field ( mandatory ) AgencyId, CustomerId, BeginDate, EndDate, OverallStatus, BookingFee, CurrencyCode;
 
   // Instance bound factory data action for copy button
   // Cardinality how many records can be copied at a type. Only one for our scenario
   factory action copyTravel [1];
+
+  // Adding side effects which inform RAP to reload the total price if the booking fee changed
+  side effects
+  {
+    field BookingFee affects field TotalPrice;
+  }
 
   mapping for /dmo/travel_m
     {
@@ -84,9 +103,17 @@ early numbering
   field ( readonly ) TravelId, BookingId;
   field ( mandatory ) CarrierId, ConnectionId, FlightDate, BookingStatus;
 
+  determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }
+
   //  field ( readonly ) TravelId;
   association _Travel;
   association _BookingSupplement { create; }
+
+  // Adding side effects which inform RAP to reload the total price if the booking fee changed
+  side effects
+  {
+    field FlightPrice affects field _Travel.TotalPrice;
+  }
 
   mapping for /dmo/booking_m
     {
@@ -123,6 +150,14 @@ early numbering
   //  field ( readonly ) TravelId, BookingId;
   association _Travel;
   association _Booking;
+
+  determination calculateTotalPrice on modify { create; field Price, CurrencyCode; }
+
+  // Adding side effects which inform RAP to reload the total price if the booking fee changed
+  side effects
+  {
+    field Price affects field _Travel.TotalPrice;
+  }
 
   mapping for /dmo/booksuppl_m
     {

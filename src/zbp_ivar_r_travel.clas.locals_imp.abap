@@ -1,3 +1,50 @@
+CLASS lsc_zivar_r_travel DEFINITION INHERITING FROM cl_abap_behavior_saver.
+
+  PROTECTED SECTION.
+
+    METHODS save_modified REDEFINITION.
+
+ENDCLASS.
+
+CLASS lsc_zivar_r_travel IMPLEMENTATION.
+
+  METHOD save_modified.
+    DATA: travel_log_update TYPE STANDARD TABLE OF /dmo/log_travel,
+          final_changes     TYPE STANDARD TABLE OF /dmo/log_travel.
+
+    IF update-travel IS NOT INITIAL.
+      travel_log_update = CORRESPONDING #( update-travel MAPPING
+                                              travel_id = TravelId
+                                          ).
+      LOOP AT update-travel ASSIGNING FIELD-SYMBOL(<travel_log_update>).
+        ASSIGN travel_log_update[ travel_id = <travel_log_update>-TravelId ]
+            TO FIELD-SYMBOL(<travel_log_db>).
+
+        GET TIME STAMP FIELD <travel_log_db>-created_at.
+
+        IF <travel_log_update>-%control-CustomerId = if_abap_behv=>mk-on.
+          <travel_log_db>-change_id = cl_system_uuid=>create_uuid_x16_static(  ).
+          <travel_log_db>-changed_field_name = 'Ivar_Customer'.
+          <travel_log_db>-changed_value = <travel_log_update>-customerId.
+          <travel_log_db>-changing_operation = 'Change'.
+          APPEND <travel_log_db> TO final_changes.
+        ENDIF.
+
+        IF <travel_log_update>-%control-AgencyId = if_abap_behv=>mk-on.
+          <travel_log_db>-change_id = cl_system_uuid=>create_uuid_x16_static(  ).
+          <travel_log_db>-changed_field_name = 'Ivar_Agency'.
+          <travel_log_db>-changed_value = <travel_log_update>-AgencyId.
+          <travel_log_db>-changing_operation = 'Change'.
+          APPEND <travel_log_db> TO final_changes.
+        ENDIF.
+      ENDLOOP.
+
+      INSERT /dmo/log_travel FROM TABLE @final_changes.
+    ENDIF.
+  ENDMETHOD.
+
+ENDCLASS.
+
 CLASS lhc_Travel DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
 
@@ -11,6 +58,13 @@ CLASS lhc_Travel DEFINITION INHERITING FROM cl_abap_behavior_handler.
       IMPORTING keys FOR ACTION Travel~copyTravel.
     METHODS get_instance_features FOR INSTANCE FEATURES
       IMPORTING keys REQUEST requested_features FOR Travel RESULT result.
+    METHODS recalctotalprice FOR MODIFY
+      IMPORTING keys FOR ACTION travel~recalctotalprice.
+
+    METHODS calculatetotalprice FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR travel~calculatetotalprice.
+    METHODS validateheaderdata FOR VALIDATE ON SAVE
+      IMPORTING keys FOR travel~validateheaderdata.
 
     METHODS earlynumbering_create FOR NUMBERING
       IMPORTING entities FOR CREATE Travel.
@@ -310,6 +364,209 @@ CLASS lhc_Travel IMPLEMENTATION.
                                                             THEN if_abap_behv=>fc-o-disabled
                                                             ELSE if_abap_behv=>fc-o-enabled   )
                       ) ).
+
+  ENDMETHOD.
+
+  METHOD reCalcTotalPrice.
+
+*   Define a structure where we can store all the booking fees & currency code
+    TYPES: BEGIN OF ty_amount_per_currency,
+             amount        TYPE /dmo/total_price,
+             currency_code TYPE /dmo/currency_code,
+           END OF ty_amount_per_currency.
+
+    DATA: amounts_per_currencycode TYPE STANDARD TABLE OF ty_amount_per_currency.
+
+
+*   Read all travel instances, subsequent bookings using EML
+    READ ENTITIES OF zivar_r_travel IN LOCAL MODE
+        ENTITY travel
+        FIELDS ( BookingFee CurrencyCode )
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(travels).
+
+    READ ENTITIES OF zivar_r_travel IN LOCAL MODE
+           ENTITY travel BY \_Booking
+           FIELDS ( FlightPrice CurrencyCode )
+           WITH CORRESPONDING #( travels )
+           RESULT DATA(bookings).
+
+    READ ENTITIES OF zivar_r_travel IN LOCAL MODE
+           ENTITY booking BY \_BookingSupplement
+           FIELDS ( Price CurrencyCode )
+           WITH CORRESPONDING #( bookings )
+           RESULT DATA(bookingsupplements).
+
+
+*   Delete the values with out any currency
+    DELETE travels WHERE CurrencyCode IS INITIAL.
+    DELETE bookings WHERE CurrencyCode IS INITIAL.
+    DELETE bookingsupplements WHERE CurrencyCode IS INITIAL.
+
+*   Total all booking & Supplement amounts which are in common currency
+    LOOP AT travels ASSIGNING FIELD-SYMBOL(<travel>).
+
+      " Set the first value for total price by adding the booking fee from header
+      amounts_per_currencycode = VALUE #( ( amount        = <travel>-BookingFee
+                                            currency_code = <travel>-CurrencyCode ) ).
+
+*   Loop at all amounts & compare with target currency
+      LOOP AT bookings INTO DATA(booking) WHERE travelid = <travel>-TravelId.
+        COLLECT VALUE ty_amount_per_currency( amount = booking-FlightPrice
+                                              currency_code = booking-CurrencyCode ) INTO amounts_per_currencycode.
+
+      ENDLOOP.
+
+      LOOP AT bookingsupplements INTO DATA(bookingsuppl) WHERE travelid = <travel>-TravelId.
+        COLLECT VALUE ty_amount_per_currency( amount = bookingsuppl-Price
+                                              currency_code = bookingsuppl-CurrencyCode ) INTO amounts_per_currencycode.
+      ENDLOOP.
+
+      CLEAR <travel>-TotalPrice.
+*   Perform currency conversion
+      LOOP AT amounts_per_currencycode INTO DATA(amount_per_currencycode).
+        IF amount_per_currencycode-currency_code = <travel>-CurrencyCode.
+          <travel>-TotalPrice += amount_per_currencycode-amount.
+        ELSE.
+          /dmo/cl_flight_amdp=>convert_currency(
+            EXPORTING
+              iv_amount               = amount_per_currencycode-amount
+              iv_currency_code_source = amount_per_currencycode-currency_code
+              iv_currency_code_target = <travel>-CurrencyCode
+              iv_exchange_rate_date   = cl_abap_context_info=>get_system_date(  )
+            IMPORTING
+              ev_amount               = DATA(lv_amount)
+          ).
+
+          <travel>-TotalPrice += lv_amount.
+
+        ENDIF.
+      ENDLOOP.
+*   Put back total amount
+
+    ENDLOOP.
+*   Return the total amount in Mapped so the RAP will modify this data in DB
+    MODIFY ENTITIES OF zivar_r_travel IN LOCAL MODE
+        ENTITY travel
+            UPDATE FIELDS ( TotalPrice )
+                WITH CORRESPONDING #( travels ).
+
+  ENDMETHOD.
+
+  METHOD calculateTotalPrice.
+
+*  Invoke reusable method reCalcTotalPrice using execute in modify
+    MODIFY ENTITIES OF zivar_r_travel IN LOCAL MODE
+      ENTITY travel
+          EXECUTE reCalcTotalPrice
+              FROM CORRESPONDING #( keys ).
+
+  ENDMETHOD.
+
+  METHOD validateHeaderData.
+    READ ENTITIES OF zivar_r_travel IN LOCAL MODE
+        ENTITY Travel
+            FIELDS ( CustomerId BeginDate EndDate )
+                WITH CORRESPONDING #( keys )
+                    RESULT DATA(lt_travel).
+
+    " Step 2: Declare a sorted table for holding customer ids
+    DATA customers TYPE SORTED TABLE OF /dmo/customer WITH UNIQUE KEY customer_id.
+
+    " Stepd 3: Extract the unique customer ids in our table
+    customers = CORRESPONDING #( lt_travel DISCARDING DUPLICATES MAPPING
+                                               customer_id = CustomerId EXCEPT *
+                                ).
+    DELETE customers WHERE customer_id IS INITIAL.
+
+    " Validation for customer id
+    IF customers IS NOT INITIAL.
+      SELECT FROM /dmo/customer FIELDS customer_id
+          FOR ALL ENTRIES IN @customers
+              WHERE customer_id = @customers-customer_id
+              INTO TABLE @DATA(lt_cust_db).
+
+    ENDIF.
+    LOOP AT lt_travel INTO DATA(ls_travel).
+      IF ( ls_travel-CustomerId IS INITIAL OR
+           NOT line_exists( lt_cust_db[ customer_id = ls_travel-customerid ] ) ).
+        " Inform RAP framework to terminate the create
+
+        APPEND VALUE #( %tky = ls_travel-%tky ) TO failed-travel.
+        APPEND VALUE #( %tky = ls_travel-%tky
+                        %element-customerid = if_abap_behv=>mk-on
+                        %msg = NEW /dmo/cm_flight_messages(
+                                          textid                = /dmo/cm_flight_messages=>customer_unkown
+                                          customer_id           = ls_travel-customerid
+                                          severity              = if_abap_behv_message=>severity-error
+
+                                                           )
+                    ) TO reported-travel.
+      ENDIF.
+*        //  check if begin and end date is empty
+*  // end date > begin date
+*  // Begin date should be in future
+      IF (  ls_travel-BeginDate IS INITIAL OR
+            ls_travel-EndDate IS INITIAL OR
+            ls_travel-BeginDate > ls_travel-EndDate OR
+            ls_travel-BeginDate > cl_abap_context_info=>get_system_date(  )
+         ).
+
+        APPEND VALUE #( %tky = ls_travel-%tky ) TO failed-travel.
+        IF ls_travel-BeginDAte IS INITIAL.
+          APPEND VALUE #( %tky = ls_travel-%tky
+                          %element-BeginDate = if_abap_behv=>mk-on
+                          %msg = NEW /dmo/cm_flight_messages(
+                                            textid                = /dmo/cm_flight_messages=>enter_begin_date
+                                            begin_date            = ls_travel-BeginDate
+                                            severity              = if_abap_behv_message=>severity-error
+
+                                                             )
+                      ) TO reported-travel.
+        ENDIF.
+
+        IF ls_travel-EndDAte IS INITIAL.
+          APPEND VALUE #( %tky = ls_travel-%tky
+                          %element-Enddate = if_abap_behv=>mk-on
+                          %msg = NEW /dmo/cm_flight_messages(
+                                            textid                = /dmo/cm_flight_messages=>enter_end_date
+                                            end_date            = ls_travel-EndDate
+                                            severity              = if_abap_behv_message=>severity-error
+
+                                                             )
+                      ) TO reported-travel.
+        ENDIF.
+        IF ls_travel-BeginDate > ls_travel-EndDate.
+          APPEND VALUE #( %tky = ls_travel-%tky
+                          %element-BeginDate = if_abap_behv=>mk-on
+                          %msg = NEW /dmo/cm_flight_messages(
+                                            textid                = /dmo/cm_flight_messages=>begin_date_bef_end_date
+                                            begin_date            = ls_travel-BeginDate
+                                            end_date              = ls_travel-EndDate
+                                            severity              = if_abap_behv_message=>severity-error
+
+                                                             )
+                      ) TO reported-travel.
+        ENDIF.
+
+        IF ls_travel-BeginDate > cl_abap_context_info=>get_system_date(  ).
+          APPEND VALUE #( %tky = ls_travel-%tky
+                          %element-BeginDate = if_abap_behv=>mk-on
+                          %msg = NEW /dmo/cm_flight_messages(
+                                            textid                = /dmo/cm_flight_messages=>begin_date_on_or_bef_sysdate
+                                            begin_date            = ls_travel-BeginDate
+                                            end_date              = ls_travel-EndDate
+                                            severity              = if_abap_behv_message=>severity-error
+
+                                                             )
+                      ) TO reported-travel.
+        ENDIF.
+
+      ENDIF.
+
+    ENDLOOP.
+
+
 
   ENDMETHOD.
 
