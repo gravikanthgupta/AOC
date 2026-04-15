@@ -77,6 +77,53 @@ ENDCLASS.
 CLASS lhc_Travel IMPLEMENTATION.
 
   METHOD get_instance_authorizations.
+    DATA: ls_result LIKE LINE OF result.
+
+    " Step 1: Get the data of my instance
+    READ ENTITIES OF zivar_r_travel IN LOCAL MODE
+        ENTITY Travel
+            FIELDS ( TravelId OverallStatus )
+                WITH CORRESPONDING #( keys )
+                    RESULT DATA(lt_travel)
+                    FAILED DATA(ls_failed).
+
+
+    " Step 2: Loop at the data
+    LOOP AT lt_travel INTO DATA(ls_travel).
+
+      " Step 3: Check if the instance was having status = cancelled
+      IF ( ls_travel-OverallStatus = 'X' ).
+        DATA(lv_auth) = abap_false.
+
+        " Step 4: Check for authorization in org
+        " Right now we dont have authorization object to check so commented the code.
+*            authority-check object 'CUSTOM_OBJ'
+*                ID '' field
+*        IF sy-subrc <> 0.
+*          lv_auth = abap_false.
+*        ELSE.
+*          lv_auth = abap_true.
+*        ENDIF.
+
+      ELSE.
+        lv_auth = abap_true.
+      ENDIF.
+
+      ls_result = VALUE #( TravelId = ls_travel-TravelId
+                           %update = COND #( WHEN lv_auth EQ abap_false
+                                                  THEN if_abap_behv=>auth-unauthorized
+                                                  ELSE if_abap_behv=>auth-allowed
+                                            )
+                          %action-copyTravel = COND #( WHEN lv_auth EQ abap_false
+                                                  THEN if_abap_behv=>auth-unauthorized
+                                                  ELSE if_abap_behv=>auth-allowed
+                                            )
+                         ).
+      APPEND ls_result TO result.
+
+
+      " Step 5: If permission is denied - Role is not added for user, reject the edit
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD get_global_authorizations.
@@ -113,10 +160,12 @@ CLASS lhc_Travel IMPLEMENTATION.
         LOOP AT entities_wo_travelid INTO entity .
           APPEND VALUE #( %cid = entity-%cid
                           %key = entity-%key
+                          %is_draft = entity-%is_draft
                           %msg = lx_number_ranges )
                         TO reported-travel.
           APPEND VALUE #( %cid = entity-%cid
-                          %key = entity-%key  )
+                          %key = entity-%key
+                          %is_draft = entity-%is_draft )
                         TO failed-travel.
         ENDLOOP.
         EXIT.
@@ -130,6 +179,7 @@ CLASS lhc_Travel IMPLEMENTATION.
         LOOP AT entities_wo_travelid INTO entity .
           APPEND VALUE #( %cid = entity-%cid
                           %key = entity-%key
+                          %is_draft = entity-%is_draft
                           %msg = NEW /dmo/cm_flight_messages(
                                   textid = /dmo/cm_flight_messages=>number_range_depleted
                                   severity = if_abap_behv_message=>severity-warning ) )
@@ -142,6 +192,7 @@ CLASS lhc_Travel IMPLEMENTATION.
         LOOP AT entities_wo_travelid INTO entity .
           APPEND VALUE #( %cid = entity-%cid
                           %key = entity-%key
+                          %is_draft = entity-%is_draft
                           %msg = NEW /dmo/cm_flight_messages(
                                   textid = /dmo/cm_flight_messages=>not_sufficient_numbers
                                   severity = if_abap_behv_message=>severity-warning ) )
@@ -149,6 +200,7 @@ CLASS lhc_Travel IMPLEMENTATION.
 
           APPEND VALUE #( %cid = entity-%cid
                           %key = entity-%key
+                           %is_draft = entity-%is_draft
                           %fail-cause = if_abap_behv=>cause-conflict )
                         TO failed-travel.
         ENDLOOP.
@@ -167,6 +219,7 @@ CLASS lhc_Travel IMPLEMENTATION.
       entity-TravelId = travel_id_max.
 
       APPEND VALUE #( %cid = entity-%cid
+                      %is_draft = entity-%is_draft
                       %key = entity-%key )
                     TO mapped-travel.
     ENDLOOP.
@@ -246,6 +299,7 @@ CLASS lhc_Travel IMPLEMENTATION.
         IF <booking_wo_numbers>-bookingid IS INITIAL.
           max_booking_id += 10 .
           <mapped_booking>-bookingid = max_booking_id .
+          <mapped_booking>-%is_draft = <booking_wo_numbers>-%is_draft .
         ENDIF.
       ENDLOOP.
 
@@ -451,15 +505,35 @@ CLASS lhc_Travel IMPLEMENTATION.
             UPDATE FIELDS ( TotalPrice )
                 WITH CORRESPONDING #( travels ).
 
+
   ENDMETHOD.
 
   METHOD calculateTotalPrice.
+
+   types: ty_travel like liNE OF keys.
+
+   DATA travel_ids TYPE STANDARD TABLE OF ty_travel WITH UNIQUE HASHED KEY key COMPONENTS TravelId.
+
+    travel_ids = CORRESPONDING #( keys DISCARDING DUPLICATES  ).
 
 *  Invoke reusable method reCalcTotalPrice using execute in modify
     MODIFY ENTITIES OF zivar_r_travel IN LOCAL MODE
       ENTITY travel
           EXECUTE reCalcTotalPrice
-              FROM CORRESPONDING #( keys ).
+              FROM CORRESPONDING #( travel_ids ).
+
+*    DATA travel_ids LIKE  keys.
+*
+*    travel_ids = CORRESPONDING #( keys ).
+*
+*    SORT travel_ids BY TravelId.
+*    DELETE ADJACENT DUPLICATES FROM travel_ids COMPARING TravelId.
+
+**  Invoke reusable method reCalcTotalPrice using execute in modify
+*    MODIFY ENTITIES OF zivar_r_travel IN LOCAL MODE
+*      ENTITY travel
+*          EXECUTE reCalcTotalPrice
+*              FROM CORRESPONDING #( travel_ids ).
 
   ENDMETHOD.
 

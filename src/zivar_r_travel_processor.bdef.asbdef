@@ -1,18 +1,27 @@
 projection;
 strict ( 2 );
 
+use draft;
+
 define behavior for zivar_r_travel_processor alias Travel
 {
-// Here for all use came. That means these functionalieis bring from original one
+  // Here for all use came. That means these functionalieis bring from original one
   use create;
   use update;
   use delete;
 
-// Expose the copyTravel to projection also.
-  use action copyTravel;
-  use association _Booking { create; }
+  use action activate;
+  use action Prepare;
+  use action edit;
+  use action discard;
+  use action resume;
 
-   side effects
+
+  // Expose the copyTravel to projection also.
+  use action copyTravel;
+  use association _Booking { create; with draft; }
+
+  side effects
   {
     field BookingFee affects field TotalPrice;
   }
@@ -23,10 +32,10 @@ define behavior for zivar_r_booking_processor alias Booking
   use update;
   use delete;
 
-  use association _Travel;
-  use association _BookingSupplement { create; }
+  use association _Travel { with draft; }
+  use association _BookingSupplement { create; with draft; }
 
-   side effects
+  side effects
   {
     field FlightPrice affects field _Travel.TotalPrice;
   }
@@ -37,10 +46,10 @@ define behavior for ZIVAR_R_BOOkSUPPL_PROCESSOR alias BookSuppl
   use update;
   use delete;
 
-  use association _Travel;
-  use association _Booking;
+  use association _Travel { with draft; }
+  use association _Booking { with draft; }
 
-   side effects
+  side effects
   {
     field Price affects field _Travel.TotalPrice;
   }

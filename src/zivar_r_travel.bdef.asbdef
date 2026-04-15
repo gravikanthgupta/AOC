@@ -4,6 +4,9 @@ managed implementation in class zbp_ivar_r_travel unique;
 // 2 - is latest guidelines. 1 - old guidelines
 strict ( 2 );
 
+// Add draft feature at BO level
+with draft;
+
 // Define the behaviour for root entity Travel
 define behavior for zivar_r_travel alias Travel
 // Make the behaviour pool/implementation for travel entity
@@ -15,10 +18,16 @@ persistent table /dmo/travel_m
 // If a travel request is locked then other users cannot edit the childs - Bookings & Supplements
 lock master
 
+// Mandatory to use total etag
+total etag LastChangedAt
+
 // Authorization. Instance & Global
 // Instance : Based on the each record
 // Global: Based on table wise
 authorization master ( instance )
+
+// Specify the draft table - will be created by RAP framework
+draft table zivar_d_travel
 
 // etag for concurrency control
 etag master LastChangedAt
@@ -37,7 +46,8 @@ with additional save
   // Dynamic feature control at the time of creation of Booking. Creation of booking isntances
   // controlled by dynamic feature based on rejection or not
 
-  association _Booking { create ( features : instance ); }
+  // Add draft also for booking
+  association _Booking { create ( features : instance ); with draft; }
 
   // Its a piece of code which is intented to be only consumed within our RAP BO
   // We cannot use outside RAP
@@ -59,11 +69,21 @@ with additional save
   // Cardinality how many records can be copied at a type. Only one for our scenario
   factory action copyTravel [1];
 
+  // Create a new determine action
+  determine action validationCustomer { validation validateHeaderData; }
   // Adding side effects which inform RAP to reload the total price if the booking fee changed
   side effects
   {
     field BookingFee affects field TotalPrice;
+    determine action validationCustomer executed on field CustomerId affects messages;
   }
+
+  // adding the draft actions
+  draft determine action Prepare;
+  draft action Edit;
+  draft action Resume;
+  draft action Activate;
+  draft action Discard;
 
   mapping for /dmo/travel_m
     {
@@ -91,8 +111,14 @@ implementation in class zbp_ivar_r_booking unique
 
 //It tells to RAP framework which table needs to update
 persistent table /dmo/booking_m
+
+
 lock dependent by _Travel
 authorization dependent by _Travel
+
+//Add draft table
+draft table zivar_d_book
+
 etag master LastChangedAt
 early numbering
 {
@@ -103,11 +129,15 @@ early numbering
   field ( readonly ) TravelId, BookingId;
   field ( mandatory ) CarrierId, ConnectionId, FlightDate, BookingStatus;
 
-  determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }
+    determination calculateTotalPrice on modify { create; field FlightPrice, CurrencyCode; }
+//  determination calculateTotalPrice on modify { create; }
 
   //  field ( readonly ) TravelId;
-  association _Travel;
-  association _BookingSupplement { create; }
+  // Reconfirm that booking will create with travel draft
+  association _Travel { with draft; }
+
+  // Assure that child entity also manage with draft
+  association _BookingSupplement { create; with draft; }
 
   // Adding side effects which inform RAP to reload the total price if the booking fee changed
   side effects
@@ -136,8 +166,11 @@ define behavior for zivar_r_booksuppl alias BookSuppl
 // Make the behaviour pool/implementation for Booking Supplement entity
 implementation in class zbp_ivar_r_booksuppl unique
 persistent table /dmo/booksuppl_m
+
 lock dependent by _Travel
 authorization dependent by _Travel
+
+draft table zivar_d_booksp
 etag master LastChangedAt
 early numbering
 {
@@ -148,10 +181,11 @@ early numbering
   field ( mandatory ) Price, SupplementId;
 
   //  field ( readonly ) TravelId, BookingId;
-  association _Travel;
-  association _Booking;
+  association _Travel { with draft; }
+  association _Booking { with draft; }
 
-  determination calculateTotalPrice on modify { create; field Price, CurrencyCode; }
+    determination calculateTotalPrice on modify { create; field Price, CurrencyCode; }
+//  determination calculateTotalPrice on modify { create; }
 
   // Adding side effects which inform RAP to reload the total price if the booking fee changed
   side effects

@@ -49,6 +49,7 @@ CLASS lhc_booking IMPLEMENTATION.
         IF <booksuppl_wo_numbers>-bookingsupplementid IS INITIAL.
           max_booking_suppl_id += 1 .
           <mapped_booksuppl>-bookingsupplementid = max_booking_suppl_id .
+          <mapped_booksuppl>-%is_draft = <booksuppl_wo_numbers>-%is_draft .
         ENDIF.
       ENDLOOP.
 
@@ -56,11 +57,18 @@ CLASS lhc_booking IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD calculateTotalPrice.
+
+    TYPES: ty_travel LIKE LINE OF keys.
+
+    DATA travel_ids TYPE STANDARD TABLE OF ty_travel WITH UNIQUE HASHED KEY key COMPONENTS TravelId.
+
+    travel_ids = CORRESPONDING #( keys DISCARDING DUPLICATES  MAPPING TravelId = TravelId %is_draft = %is_draft ).
+
 *    Invoke reusable method reCalcTotalPrice using execute in modify
     MODIFY ENTITIES OF zivar_r_travel IN LOCAL MODE
       ENTITY travel
           EXECUTE reCalcTotalPrice
-              FROM CORRESPONDING #( keys ).
+              FROM CORRESPONDING #( travel_ids ).
   ENDMETHOD.
 
 ENDCLASS.
